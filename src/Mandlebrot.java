@@ -2,6 +2,7 @@ import java.awt.Color;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
@@ -11,12 +12,14 @@ public class Mandlebrot implements KeyListener{
 	private BufferedImage image;
 	private JFrame window;
 	private JLabel label;
+	private JLabel textLabel;
+	
+	private byte[] pixels;
 	
 	private double hmin = -1.5;
 	private double hmax =  1.5;
 	private double vmin = -1.5;
 	private double vmax =  1.5;
-	private double zoom = 1;
 	
 	private int width;
 	private int height;
@@ -28,7 +31,15 @@ public class Mandlebrot implements KeyListener{
 		
 		window = new JFrame();
 		label = new JLabel();
-		image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+		textLabel = new JLabel();
+		textLabel.setOpaque(true);
+		textLabel.setBackground(Color.WHITE);
+		textLabel.setBounds(0, 0, 300, 50);
+		label.add(textLabel);
+		
+		image = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
+		
+		pixels = new byte[width * height * 4];
 		
 		maxIterations = 100;
 		
@@ -36,7 +47,9 @@ public class Mandlebrot implements KeyListener{
 		window.add(label);
 		window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		window.addKeyListener(this);
+		window.setResizable(false);
 		window.setVisible(true);
+		window.pack();
 		
 		generateMandlebrotImage();
 	}
@@ -44,16 +57,19 @@ public class Mandlebrot implements KeyListener{
 	private void generateMandlebrotImage() {
 		for(int i = 0; i < height; i++) {
 			for(int j = 0; j < width; j++) {
-				Color c = calculateMandlebrotPixelColor(j, i);
-				image.setRGB(j, i, c.getRGB());
+				byte[] px = calculateMandlebrotPixelColor(j, i);
+				pixels[i * width * 4 + j * 4 + 0] = px[3];
+				pixels[i * width * 4 + j * 4 + 1] = px[2];
+				pixels[i * width * 4 + j * 4 + 2] = px[1];
+				pixels[i * width * 4 + j * 4 + 3] = px[0];
 			}
 		}
-
+		byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
+		System.arraycopy(pixels, 0, imgData, 0, pixels.length);
 		label.setIcon(new ImageIcon(image));
-		window.pack();
 	}
 	
-	private Color calculateMandlebrotPixelColor(int x, int y) {
+	private byte[] calculateMandlebrotPixelColor(int x, int y) {
 		double a = map(x, 0, width, hmin, hmax);
 		double b = map(y, 0, height, vmin, vmax);
 		
@@ -75,14 +91,16 @@ public class Mandlebrot implements KeyListener{
 			n++;
 		}
 		
-		return new Color(0.5f * (float)Math.sin(0.1 * n + 0) + 0.5f,
-		                 0.5f * (float)Math.sin(0.1 * n + 2) + 0.5f, 
-				         0.5f * (float)Math.sin(0.1 * n + 4) + 0.5f, 
-				         1.0f);
-	}
-	
-	public static void main(String[] args) {
-		new Mandlebrot(1200,1000);
+		double rd = 0.5f * Math.sin(0.1 * n + 0) + 0.5f;
+		double gr = 0.5f * Math.sin(0.1 * n + 2) + 0.5f;
+		double bl = 0.5f * Math.sin(0.1 * n + 4) + 0.5f;
+		
+		return new byte[] {
+			(byte)(rd * 255),
+			(byte)(gr * 255), 
+			(byte)(bl * 255), 
+			(byte)255
+		};
 	}
 	
 	public double map(double val, double min1, double max1, double min2, double max2) {
@@ -97,23 +115,27 @@ public class Mandlebrot implements KeyListener{
 	@Override
 	public void keyPressed(KeyEvent e) {	
 		if(e.getKeyCode() == KeyEvent.VK_UP) {
-			vmin -= 0.1 * zoom;
-			vmax -= 0.1 * zoom;
+			double pct = (vmax - vmin) * 0.1;
+			vmin -= pct;
+			vmax -= pct;
 			generateMandlebrotImage();
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_DOWN) {
-			vmin += 0.1 * zoom;
-			vmax += 0.1 * zoom;
+			double pct = (vmax - vmin) * 0.1;
+			vmin += pct;
+			vmax += pct;
 			generateMandlebrotImage();
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_LEFT) {
-			hmin -= 0.1 * zoom;
-			hmax -= 0.1 * zoom;
+			double pct = (hmax - hmin) * 0.1;
+			hmin -= pct;
+			hmax -= pct;
 			generateMandlebrotImage();
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_RIGHT) {
-			hmin += 0.1 * zoom;
-			hmax += 0.1 * zoom;
+			double pct = (hmax - hmin) * 0.1;
+			hmin += pct;
+			hmax += pct;
 			generateMandlebrotImage();
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_Z) {
@@ -125,28 +147,33 @@ public class Mandlebrot implements KeyListener{
 			generateMandlebrotImage();
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_COMMA) {
-			zoom *= 1.05;
-			hmin -= 0.1 * zoom;
-			hmax += 0.1 * zoom;
-			vmin -= 0.1 * zoom;
-			vmax += 0.1 * zoom;
+			double hpct = (hmax - hmin) * 0.1;
+			double vpct = (vmax - vmin) * 0.1;
+			hmin -= hpct;
+			hmax += hpct;
+			vmin -= vpct;
+			vmax += vpct;
 			generateMandlebrotImage();
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_PERIOD) {
-			zoom *= 0.95;
-			hmin += 0.1 * zoom;
-			hmax -= 0.1 * zoom;
-			vmin += 0.1 * zoom;
-			vmax -= 0.1 * zoom;
+			double hpct = (hmax - hmin) * 0.1;
+			double vpct = (vmax - vmin) * 0.1;
+			hmin += hpct;
+			hmax -= hpct;
+			vmin += vpct;
+			vmax -= vpct;
 			generateMandlebrotImage();
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_ESCAPE) {
 			System.exit(0);
 		}
-		System.out.println(zoom);
 	}
 
 	@Override
 	public void keyReleased(KeyEvent e) {	
+	}
+	
+	public static void main(String[] args) {
+		new Mandlebrot(1920, 1080);
 	}
 }
