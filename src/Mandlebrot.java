@@ -1,6 +1,11 @@
 import java.awt.Color;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 
@@ -8,13 +13,16 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
-public class Mandlebrot implements KeyListener{
+public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListener, MouseWheelListener{
 	private BufferedImage image;
 	private JFrame window;
 	private JLabel label;
 	private JLabel textLabel;
 	
 	private byte[] pixels;
+	
+	private long frameStart = 0;
+	private float frameTime = 0;
 	
 	private double hmin = -1.5;
 	private double hmax =  1.5;
@@ -24,6 +32,9 @@ public class Mandlebrot implements KeyListener{
 	private int width;
 	private int height;
 	private int maxIterations;
+	
+	private int mouseX;
+	private int mouseY;
 	
 	public Mandlebrot(int width, int height) {
 		this.width = width;
@@ -41,12 +52,15 @@ public class Mandlebrot implements KeyListener{
 		
 		pixels = new byte[width * height * 4];
 		
-		maxIterations = 100;
+		maxIterations = 64;
 		
 		label.setIcon(new ImageIcon(image));
 		window.add(label);
 		window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		window.addKeyListener(this);
+		window.addMouseListener(this);
+		window.addMouseMotionListener(this);
+		window.addMouseWheelListener(this);
 		window.setResizable(false);
 		window.setVisible(true);
 		window.pack();
@@ -54,7 +68,13 @@ public class Mandlebrot implements KeyListener{
 		generateMandlebrotImage();
 	}
 	
+	private void generateMandlebrotSubImage(int x, int y, int w, int h) {
+		
+	}
+	
 	private void generateMandlebrotImage() {
+		frameStart = System.nanoTime();
+		
 		for(int i = 0; i < height; i++) {
 			for(int j = 0; j < width; j++) {
 				byte[] px = calculateMandlebrotPixelColor(j, i);
@@ -67,6 +87,10 @@ public class Mandlebrot implements KeyListener{
 		byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
 		System.arraycopy(pixels, 0, imgData, 0, pixels.length);
 		label.setIcon(new ImageIcon(image));
+		
+		frameTime = (float)((System.nanoTime() - frameStart) / 1000000000.0);
+		textLabel.setText("<html>Iterations: " + maxIterations + "<br>Calc Time: " + frameTime + " seconds</html>");		
+		window.pack();
 	}
 	
 	private byte[] calculateMandlebrotPixelColor(int x, int y) {
@@ -107,11 +131,7 @@ public class Mandlebrot implements KeyListener{
 		double pctg = (val - min1) / (max1 - min1);
 		return (pctg * (max2 - min2)) + min2;
 	}
-
-	@Override
-	public void keyTyped(KeyEvent e) {
-	}
-
+	
 	@Override
 	public void keyPressed(KeyEvent e) {	
 		if(e.getKeyCode() == KeyEvent.VK_UP) {
@@ -170,10 +190,74 @@ public class Mandlebrot implements KeyListener{
 	}
 
 	@Override
+	public void mouseDragged(MouseEvent e) {
+		double xdif = e.getX() - mouseX;
+		double ydif = e.getY() - mouseY;
+		mouseX = e.getX();
+		mouseY = e.getY();
+		double pct = (vmax - vmin) * 0.002;
+		vmin -= ydif * pct;
+		vmax -= ydif * pct;
+		hmin -= xdif * pct;
+		hmax -= xdif * pct;
+		generateMandlebrotImage();
+	}
+	
+	@Override
+	public void mouseWheelMoved(MouseWheelEvent e) {
+		double hpct = (hmax - hmin) * 0.1 * e.getWheelRotation();
+		double vpct = (vmax - vmin) * 0.1 * e.getWheelRotation();
+		hmin -= hpct;
+		hmax += hpct;
+		vmin -= vpct;
+		vmax += vpct;
+		generateMandlebrotImage();		
+	}
+	
+	@Override
+	public void mousePressed(MouseEvent e) {
+		if(e.getButton() == MouseEvent.BUTTON1) {
+			mouseX = e.getX();
+			mouseY = e.getY();
+		}
+	}
+
+	@Override
+	public void mouseClicked(MouseEvent e) {
+		if(e.getButton() == MouseEvent.BUTTON1) {
+			maxIterations *= 2;
+			generateMandlebrotImage();
+		}else if(e.getButton() == MouseEvent.BUTTON3) {
+			maxIterations /= 2;
+			generateMandlebrotImage();
+		}
+	}
+
+	@Override
+	public void keyTyped(KeyEvent e) {
+	}
+
+	@Override
 	public void keyReleased(KeyEvent e) {	
+	}
+
+	@Override
+	public void mouseMoved(MouseEvent e) {	
+	}
+	
+	@Override
+	public void mouseReleased(MouseEvent e) {
+	}
+
+	@Override
+	public void mouseEntered(MouseEvent e) {
+	}
+
+	@Override
+	public void mouseExited(MouseEvent e) {
 	}
 	
 	public static void main(String[] args) {
-		new Mandlebrot(1920, 1080);
+		new Mandlebrot(500, 500);
 	}
 }
