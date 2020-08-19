@@ -14,10 +14,18 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 
 public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListener, MouseWheelListener{
+	enum Mode {
+		SINGLE_THREAD, MULTI_THREAD
+	}
+	
+	private Mode mode;
+	
 	private BufferedImage image;
 	private JFrame window;
 	private JLabel label;
 	private JLabel textLabel;
+	
+	private MandlebrotThread[] threads;
 	
 	private byte[] pixels;
 	
@@ -36,9 +44,13 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 	private int mouseX;
 	private int mouseY;
 	
+	private int maxThreads = 9;
+	
 	public Mandlebrot(int width, int height) {
 		this.width = width;
 		this.height = height;
+		
+		mode = Mode.SINGLE_THREAD;
 		
 		window = new JFrame();
 		label = new JLabel();
@@ -52,7 +64,19 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		
 		pixels = new byte[width * height * 4];
 		
-		maxIterations = 64;
+		maxIterations = 128;
+		
+		threads = new MandlebrotThread[maxThreads];
+		int tsq = (int)Math.sqrt(maxThreads);
+		for(int i = 0; i < maxThreads; i++) {
+			int xpos = 0;
+			int ypos = i * (height / maxThreads);
+			int wid = width;
+			int hei = height / maxThreads;
+			
+			threads[i] = new MandlebrotThread(width, height, xpos, ypos, wid, hei, pixels);
+			
+		}
 		
 		label.setIcon(new ImageIcon(image));
 		window.add(label);
@@ -65,11 +89,11 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		window.setVisible(true);
 		window.pack();
 		
-		generateMandlebrotImage();
-	}
-	
-	private void generateMandlebrotSubImage(int x, int y, int w, int h) {
+		for(int i = 0; i < maxThreads; i++) {
+			threads[i].start();
+		}
 		
+		generateMandlebrotImage();
 	}
 	
 	private void generateMandlebrotImage() {
@@ -84,12 +108,38 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 				pixels[i * width * 4 + j * 4 + 3] = px[0];
 			}
 		}
+	
 		byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
 		System.arraycopy(pixels, 0, imgData, 0, pixels.length);
 		label.setIcon(new ImageIcon(image));
 		
 		frameTime = (float)((System.nanoTime() - frameStart) / 1000000000.0);
-		textLabel.setText("<html>Iterations: " + maxIterations + "<br>Calc Time: " + frameTime + " seconds</html>");		
+		textLabel.setText("<html>Iterations: " + maxIterations + "<br>Calc Time: " + frameTime + "seconds<br>Mode: " + mode + " </html>");		
+		window.pack();
+	}
+	
+	private void generateMandlebrotImageThreaded() {
+		frameStart = System.nanoTime();
+		
+		for(int i = 0; i < maxThreads; i++) {
+			threads[i].vmin = vmin;
+			threads[i].vmax = vmax;
+			threads[i].hmin = hmin;
+			threads[i].hmax = hmax;
+			threads[i].maxIterations = maxIterations;
+			threads[i].update = true;
+		}
+		for(int i = 0; i < maxThreads; i++) {
+			while(threads[i].update == true);
+			System.arraycopy(threads[i].pixels, 0, pixels, threads[i].pixelOffset, threads[i].pixelSize);
+		}
+	
+		byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
+		System.arraycopy(pixels, 0, imgData, 0, pixels.length);
+		label.setIcon(new ImageIcon(image));
+		
+		frameTime = (float)((System.nanoTime() - frameStart) / 1000000000.0);
+		textLabel.setText("<html>Iterations: " + maxIterations + "<br>Calc Time: " + frameTime + "seconds<br>Mode: " + mode + " </html>");		
 		window.pack();
 	}
 	
@@ -133,38 +183,39 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 	}
 	
 	@Override
-	public void keyPressed(KeyEvent e) {	
+	public void keyPressed(KeyEvent e) {
+		boolean update = false;
 		if(e.getKeyCode() == KeyEvent.VK_UP) {
 			double pct = (vmax - vmin) * 0.1;
 			vmin -= pct;
 			vmax -= pct;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_DOWN) {
 			double pct = (vmax - vmin) * 0.1;
 			vmin += pct;
 			vmax += pct;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_LEFT) {
 			double pct = (hmax - hmin) * 0.1;
 			hmin -= pct;
 			hmax -= pct;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_RIGHT) {
 			double pct = (hmax - hmin) * 0.1;
 			hmin += pct;
 			hmax += pct;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_Z) {
 			maxIterations /= 2;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_X) {
 			maxIterations *= 2;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_COMMA) {
 			double hpct = (hmax - hmin) * 0.1;
@@ -173,7 +224,7 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 			hmax += hpct;
 			vmin -= vpct;
 			vmax += vpct;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_PERIOD) {
 			double hpct = (hmax - hmin) * 0.1;
@@ -182,10 +233,30 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 			hmax -= hpct;
 			vmin += vpct;
 			vmax -= vpct;
-			generateMandlebrotImage();
+			update = true;
 		}
 		else if(e.getKeyCode() == KeyEvent.VK_ESCAPE) {
 			System.exit(0);
+		}
+		else if(e.getKeyCode() == KeyEvent.VK_1) {
+			mode = Mode.SINGLE_THREAD;
+			update = true;
+		}
+		else if(e.getKeyCode() == KeyEvent.VK_2) {
+			mode = Mode.MULTI_THREAD;
+			update = true;
+		}
+		if(update) {
+			switch(mode) {
+				case SINGLE_THREAD:{
+					generateMandlebrotImage();
+					break;
+				}
+				case MULTI_THREAD:{
+					generateMandlebrotImageThreaded();
+					break;
+				}
+			}
 		}
 	}
 
@@ -200,7 +271,18 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		vmax -= ydif * pct;
 		hmin -= xdif * pct;
 		hmax -= xdif * pct;
-		generateMandlebrotImage();
+	
+		switch(mode) {
+			case SINGLE_THREAD:{
+				generateMandlebrotImage();
+				break;
+			}
+			case MULTI_THREAD:{
+				generateMandlebrotImageThreaded();
+				break;
+			}
+		}
+		
 	}
 	
 	@Override
@@ -211,7 +293,16 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		hmax += hpct;
 		vmin -= vpct;
 		vmax += vpct;
-		generateMandlebrotImage();		
+		switch(mode) {
+			case SINGLE_THREAD:{
+				generateMandlebrotImage();
+				break;
+			}
+			case MULTI_THREAD:{
+				generateMandlebrotImageThreaded();
+				break;
+			}
+		}		
 	}
 	
 	@Override
@@ -226,10 +317,18 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 	public void mouseClicked(MouseEvent e) {
 		if(e.getButton() == MouseEvent.BUTTON1) {
 			maxIterations *= 2;
-			generateMandlebrotImage();
 		}else if(e.getButton() == MouseEvent.BUTTON3) {
 			maxIterations /= 2;
-			generateMandlebrotImage();
+		}
+		switch(mode) {
+			case SINGLE_THREAD:{
+				generateMandlebrotImage();
+				break;
+			}
+			case MULTI_THREAD:{
+				generateMandlebrotImageThreaded();
+				break;
+			}
 		}
 	}
 
@@ -258,6 +357,6 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 	}
 	
 	public static void main(String[] args) {
-		new Mandlebrot(500, 500);
+		new Mandlebrot(1920, 1080);
 	}
 }
