@@ -87,6 +87,12 @@ public class MandlebrotThread extends Thread{
 					}
 				}
 				update = false;
+			}else {
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}

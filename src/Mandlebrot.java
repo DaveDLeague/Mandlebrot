@@ -12,6 +12,7 @@ import java.awt.image.DataBufferByte;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 
 public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListener, MouseWheelListener{
 	enum Mode {
@@ -44,7 +45,7 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 	private int mouseX;
 	private int mouseY;
 	
-	private int maxThreads = 9;
+	private int maxThreads = 8;
 	
 	public Mandlebrot(int width, int height) {
 		this.width = width;
@@ -57,7 +58,7 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		textLabel = new JLabel();
 		textLabel.setOpaque(true);
 		textLabel.setBackground(Color.WHITE);
-		textLabel.setBounds(0, 0, 300, 50);
+		textLabel.setBounds(0, 0, 300, 75);
 		label.add(textLabel);
 		
 		image = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
@@ -114,7 +115,9 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		label.setIcon(new ImageIcon(image));
 		
 		frameTime = (float)((System.nanoTime() - frameStart) / 1000000000.0);
-		textLabel.setText("<html>Iterations: " + maxIterations + "<br>Calc Time: " + frameTime + "seconds<br>Mode: " + mode + " </html>");		
+		textLabel.setText("<html>Press F1 to view controlls<br>Iterations: " + 
+		                  maxIterations + "<br>Calc Time: " + frameTime + " seconds<br>Mode: " + 
+				          mode + " </html>");		
 		window.pack();
 	}
 	
@@ -139,7 +142,9 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		label.setIcon(new ImageIcon(image));
 		
 		frameTime = (float)((System.nanoTime() - frameStart) / 1000000000.0);
-		textLabel.setText("<html>Iterations: " + maxIterations + "<br>Calc Time: " + frameTime + "seconds<br>Mode: " + mode + " </html>");		
+		textLabel.setText("<html>Press F1 to view controlls<br>Iterations: " + 
+		                  maxIterations + "<br>Calc Time: " + frameTime + " seconds<br>Mode: " + 
+				          mode + " </html>");		
 		window.pack();
 	}
 	
@@ -245,6 +250,16 @@ public class Mandlebrot implements KeyListener, MouseListener, MouseMotionListen
 		else if(e.getKeyCode() == KeyEvent.VK_2) {
 			mode = Mode.MULTI_THREAD;
 			update = true;
+		}
+		else if(e.getKeyCode() == KeyEvent.VK_F1) {
+			JOptionPane.showMessageDialog(null, "1: Single Thread Mode\n"
+					                          + "2: Multi Thread Mode\n"
+					                          + ", or mouse scroll down: Zoom Out\n"
+					                          + ". or mouse scroll up: Zoom In\n"
+					                          + "arrow keys or drag mouse: Move Image\n"
+					                          + "z or left click: Increase Iterations\n"
+					                          + "x or right click: Decrease Iterations\n"
+					                          + "esc: Close Program");
 		}
 		if(update) {
 			switch(mode) {
